@@ -28,7 +28,7 @@ FDTD本质上是一个具有时序数据处理功能的神经网络。仿真区�
 
 该时序网络和LSTM具有一定的相似性，对于2D FDTD，其隐藏层可以使用三组量 $H_x,H_y,E_z$ 来表示，单个隐藏层的更新公式为
 
-$$
+```math
 \left\{
 \begin{aligned}
     &\begin{aligned}
@@ -47,7 +47,7 @@ $$
     \end{aligned}
 \end{aligned}
 \right.
-$$
+```
 
 其中 $CP(m),CQ(m),CA(m),CB(m)$ 是介质参数，$J_{source_z}^{n+1/2}$ 是源项。
 
