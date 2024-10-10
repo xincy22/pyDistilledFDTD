@@ -137,7 +137,7 @@ with tqdm(total=epochs * len(train_loader)) as pbar:
 可以直接使用 `fdtd` 库来进行前向仿真，也可以使用知识蒸馏后的模型来进行快速仿真。
 
 使用示例：
-```
+```python
 # 退出训练模式
 model.eval()
 
