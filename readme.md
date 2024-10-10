@@ -37,8 +37,8 @@ FDTD本质上是一个具有时序数据处理功能的神经网络。仿真区�
     \end{aligned}\\
     \\
     &\begin{aligned}
-        E_z^{n+1}(i,j)=&\;CA(m)\cdot E_z^n(i,j)\\
-        +&CB(m)\cdot \left[
+        E_z^{n+1}(i,j)&=CA(m)\cdot E_z^n(i,j)\\
+        &+CB(m)\cdot \left[
             \begin{aligned}
                 &\frac{H_y^{n+1/2}\left(i+\frac12,j\right)-H_y^{n+1/2}\left(i-\frac12,j\right)}{\Delta x}\\
                 &-\frac{H_x^{n+1/2}\left(i,j+\frac12\right)-H_x^{n+1/2}\left(i,j-\frac12\right)}{\Delta y}-J_{source_z}^{n+1/2}
