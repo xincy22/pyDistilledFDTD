@@ -301,7 +301,4 @@ predictions = student_model(source_input)
   grid[30, 33:37, 0] = fdtd.LineDetector(name="detector")
   ```
 
-## 更多信息
-
-- **源码**：请参阅源码文件 `distill_model.py` 和 `student_model.py`，其中包含详细的代码注释和文档字符串。
-- **官方文档**：更多关于 `fdtd` 库的使用，请参考官方文档：https://fdtd.readthedocs.org/
+更多关于 `fdtd` 库的使用，请参考官方文档：https://fdtd.readthedocs.org/
