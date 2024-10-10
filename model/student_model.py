@@ -1,5 +1,7 @@
 import torch
+
 import config as cfg
+
 
 def data_expand(data, time_step=cfg.time_step, method="repeat"):
     """

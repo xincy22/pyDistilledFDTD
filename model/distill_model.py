@@ -1,12 +1,13 @@
-import torch
-import numpy as np
-import os
 import hashlib
-import uuid
+import os
 import shutil
+import uuid
+
+import numpy as np
+import torch
 
 import config as cfg
-import fdtd as oNN
+from . import fdtd as oNN
 
 oNN.set_backend(cfg.backend)
 
@@ -191,7 +192,7 @@ class DistillModel(torch.nn.Module):
 
             if os.path.exists(cache_file):
                 # Load the data from cache
-                cached_data = torch.load(cache_file, map_location=cfg.device)
+                cached_data = torch.load(cache_file)
                 # Verify that the cached 'sou' matches the current 'sou'
                 if torch.equal(cached_data['source'], sou_cpu):
                     output = cached_data['output'].to(cfg.device)
