@@ -24,7 +24,7 @@
 
 ## 知识蒸馏的原理
 
-FDTD本质上是一个具有时序数据处理功能的神经网络。仿真区域中的源就是该时序神经网络的输入，仿真区域中的传感器就是该时序神经网络的输出。仿真区域中的介质就是该时序神经网络的参数。仿真区域中的探测器就是该时序神经网络的输出。
+FDTD本质上是一个具有时序数据处理功能的神经网络。仿真区域中的源就是该时序神经网络的输入，仿真区域中的传感器就是该时序神经网络的输出。
 
 该时序网络和LSTM具有一定的相似性，对于2D FDTD，其隐藏层可以使用三组量 $H_x,H_y,E_z$ 来表示，单个隐藏层的更新公式为
 
@@ -77,7 +77,7 @@ FDTD本质上是一个具有时序数据处理功能的神经网络。仿真区�
 使用示例：
 
 ```python
-from dataset import pca_data_loader, core_data_loader
+from src.dataset import pca_data_loader, core_data_loader
 
 # 加载 PCA 降维后的训练集和测试集 DataLoader
 train_loader_pca, test_loader_pca = pca_data_loader(n_components=10, batch_size=64)
@@ -104,7 +104,7 @@ train_loader_core, test_loader = core_data_loader(
 使用示例：
 
 ```python
-from model import DistillModel, StudentSequenceModel
+from src.model import DistillModel, StudentSequenceModel
 
 # 定义知识蒸馏核心模型和优化器
 model = DistillModel(radius_matrix, StudentSequenceModel).to(device)
@@ -119,12 +119,12 @@ with tqdm(total=epochs * len(train_loader)) as pbar:
         with torch.enable_grad():
             for inputs, _ in train_loader:
                 inputs = inputs.to(device)
-                
+
                 loss = model(inputs)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                
+
                 running_loss += loss.item()
                 pbar.update(1)
                 pbar.set_postfix(loss=running_loss)
