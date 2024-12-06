@@ -5,6 +5,7 @@ import shutil
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from . import fdtd as oNN
 from . import config as cfg
@@ -248,8 +249,26 @@ class DistillModel(torch.nn.Module):
         :param source: 输入数据，作为输入源的相位进行编码，每个元素都在[0, 1]之间
         :type source: torch.Tensor of shape (batch_size, ports)
 
-        :return: 损失或输出
-        :rtype: torch.Tensor or Tuple[torch.Tensor, torch.Tensor]
+        :return: 
+            - 训练模式 (self.training=True):
+                - 返回损失值。
+                - torch.Tensor of shape ()
+            
+            - 评估模式 (self.training=False):
+                - 如果启用了FDTD仿真 (self.fdtd_simulation=True):
+                    - 返回归一化后的FDTD仿真输出。
+                    - torch.Tensor of shape (batch_size, ports)
+                
+                - 如果启用了LSTM模拟 (self.lstm_simulation=True):
+                    - 返回归一化后的LSTM模拟输出。
+                    - torch.Tensor of shape (batch_size, ports)
+                
+                - 如果未启用任何仿真:
+                    - 返回FDTD仿真输出和LSTM模拟输出的元组。
+                    - Tuple[torch.Tensor, torch.Tensor]
+                        - 第一个张量: (batch_size, simulation_steps, ports)
+                        - 第二个张量: (batch_size, simulation_steps, ports)
+        :rtype: torch.Tensor 或 Tuple[torch.Tensor, torch.Tensor]
         """
         if self.training:
             with torch.no_grad():
@@ -259,9 +278,9 @@ class DistillModel(torch.nn.Module):
             return self.criterion(fdtd_output, lstm_output)
         else:
             if self.fdtd_simulation:
-                return torch.norm(self.sim(source).sum(dim=1), dim=1)
+                return F.normalize(self.sim(source).sum(dim=1), dim=1)
             elif self.lstm_simulation:
-                return torch.norm(self.student_model(self.data_expand(source)).sum(dim=1), dim=1)
+                return F.normalize(self.student_model(self.data_expand(source)).sum(dim=1), dim=1)
             else:
                 return self.sim(source), self.student_model(self.data_expand(source))
 
@@ -278,7 +297,7 @@ class DistillModel(torch.nn.Module):
         batch_output = torch.tensor([], device=self.device)
         for i in range(source.shape[0]):
             source_cpu = source[i].cpu()
-            source_hash = hashlib.sha256(source_cpu.numpy().tobytes()).hexdigest() #
+            source_hash = hashlib.sha256(source_cpu.numpy().tobytes()).hexdigest()
             cache_subdir = os.path.join(self.cache_dir, source_hash[:1], source_hash[1:2])
             os.makedirs(cache_subdir, exist_ok=True)
             cache_file = os.path.join(cache_subdir, f"{source_hash[2:]}.pt")

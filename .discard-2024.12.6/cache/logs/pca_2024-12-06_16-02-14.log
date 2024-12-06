@@ -1,0 +1,6 @@
+2024-12-06 16:02:15,923 - pca - INFO - PCA transform finished, dataset shape: torch.Size([60000, 10])
+2024-12-06 16:02:15,992 - pca - INFO - PCA transform finished, dataset shape: torch.Size([10000, 10])
+2024-12-06 16:02:16,533 - pca - INFO - PCA transform finished, dataset shape: torch.Size([60000, 10])
+2024-12-06 16:02:16,593 - pca - INFO - PCA transform finished, dataset shape: torch.Size([10000, 10])
+2024-12-06 16:02:16,968 - pca - INFO - PCA transform finished, dataset shape: torch.Size([60000, 10])
+2024-12-06 16:02:17,000 - pca - INFO - PCA transform finished, dataset shape: torch.Size([10000, 10])
