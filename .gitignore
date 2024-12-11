@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# 虚拟环境
+venv/
+env/
+.env/
+
+# 数据文件
+dataset/raw_data/
+dataset/processed_data/
+
+# 日志文件
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db 
