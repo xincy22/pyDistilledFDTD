@@ -1,3 +1,6 @@
-"""
-MNIST数据集处理和加载包
-"""
+from .data_loader import load_pca_data, load_core_set_data
+
+__all__ = [
+    'load_pca_data',
+    'load_core_set_data'
+]
