@@ -49,11 +49,23 @@ class FDTDSimulator(nn.Module):
         return batch_output
 
     def sim(self, x: torch.Tensor):
-        self.grid_init()
-        self.set_source(x)
-        self.set_permittivity()
+        self._init_grid()
+        self._set_source(x)
+        self._set_permittivity()
+        self.grid.run(simulation_step, progress_bar=False)
 
-    def grid_init(self):
+        intensities = []
+        for i in range(ports):
+            detector_values_E = torch.stack(self.grid.detectors[i].detector_values()["E"], dim=0)
+            detector_intensity = torch.mean(detector_values_E[:, :, -1].pow(2), dim=1)
+            intensities.append(detector_intensity)
+
+        output = torch.stack(intensities, dim=0)
+        print("output shape:", output.shape)
+        assert output.shape == (ports, simulation_step)
+        return output
+
+    def _init_grid(self):
         self.grid = oNN.Grid(
             shape=(Nx, Ny, 1),
             grid_spacing=dx,
@@ -73,12 +85,12 @@ class FDTDSimulator(nn.Module):
             self.grid[detector_loc, ports_slice[i], 0] = oNN.LineDetector(
                 name=f"detector{i}")
 
-    def set_source(self, source: torch.Tensor):
+    def _set_source(self, source: torch.Tensor):
         for i in range(ports):
             self.grid[source_loc, ports_slice[i], 0] = oNN.LineSource(
                 period=WAVELENGTH / SPEED_LIGHT, phase_shift=source[i] * torch.pi, name=f"source{i}")
             
-    def set_permittivity(self):
+    def _set_permittivity(self):
         if self.permittivity is not None:
             self.grid[center_slice, center_slice, 0] = oNN.Object(
                 permittivity=self.permittivity * 1.8 + 1, name="permittivity")
@@ -95,4 +107,8 @@ class FDTDSimulator(nn.Module):
             mask = (x - x_centers[i]) ** 2 + (y - y_centers[i]) ** 2 <= self.radius[i] ** 2
             outside_circle[mask] = 0
         
+        self.permittivity = outside_circle.view(center_size, center_size, 1)
+        self.grid[center_slice, center_slice, 0] = oNN.Object(
+            permittivity=self.permittivity * 1.8 + 1, name="core"
+        )
 
