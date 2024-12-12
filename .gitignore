@@ -7,6 +7,9 @@ __pycache__/
 .vscode/
 *.code-workspace
 
+# idx
+.idx/
+
 # 虚拟环境
 venv/
 env/

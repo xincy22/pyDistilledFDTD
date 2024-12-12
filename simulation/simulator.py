@@ -18,9 +18,10 @@ from .config import (
 
 oNN.set_backend(backend)
 
+
 class FDTDSimulator(nn.Module):
     def __init__(
-            self, 
+            self,
             radius_matrix: torch.Tensor | np.ndarray,
     ):
         super(FDTDSimulator, self).__init__()

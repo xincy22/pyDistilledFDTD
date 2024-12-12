@@ -1,3 +1,6 @@
 {
-    "wolf.disableHotModeWarning": true
+    "wolf.disableHotModeWarning": true,
+    "IDX.aI.enableInlineCompletion": true,
+    "IDX.aI.enableCodebaseIndexing": true,
+    "IDX.corgiMode": true
 }
