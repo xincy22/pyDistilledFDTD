@@ -61,13 +61,13 @@ class SignalExpansion:
         omega = 2 * np.pi / self.period
         
         # 扩展维度以进行广播
-        t = self.time.view(-1, 1)  # (time_steps, 1)
+        t = self.time.view(1, -1, 1)  # (time_steps, 1)
         phase_shift = phase.unsqueeze(1) * np.pi  # (batch_size, 1, ports)
-        
+
         # 生成正弦信号
         signal = torch.sin(
-            omega * t + phase_shift.transpose(1, 2)  # (batch_size, time_steps, ports)
-        )
+            omega * t + phase_shift 
+        ) # (batch_size, time_steps, ports)
         
         # 如果输入是1D的，返回2D结果
         if squeeze_output:

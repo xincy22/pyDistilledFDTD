@@ -29,11 +29,11 @@ class FDTDSimulator(nn.Module):
         self.device = device
         
         # 转换为tensor并处理小值
-        self.radius_matrix = torch.as_tensor(
-            radius_matrix, 
-            dtype=torch.float64, 
-            device=device
-        ) * (radius_matrix >= 0.3)
+        if isinstance(radius_matrix, np.ndarray):
+            radius_matrix = torch.as_tensor(radius_matrix.flatten(), dtype=torch.float64, device=device)
+        else:
+            radius_matrix = radius_matrix.flatten().to(device)
+        self.radius_matrix = radius_matrix * (radius_matrix >= 0.3)
 
         # 定义网格和介电常数
         self.grid = None
@@ -46,8 +46,10 @@ class FDTDSimulator(nn.Module):
         elif not (inputs.dim() == 2 and inputs.shape[1] == ports):
             raise ValueError(f"输入维度必须为 (ports={ports},) 或 (batch_size, ports={ports})")
         
-        batch_output = torch.vmap(self.sim)(inputs)
-        return batch_output
+        batch_output = []
+        for i in range(inputs.shape[0]):
+            batch_output.append(self.sim(inputs[i]))
+        return torch.stack(batch_output, dim=0)
 
     def sim(self, x: torch.Tensor):
         self._init_grid()
@@ -61,9 +63,14 @@ class FDTDSimulator(nn.Module):
             detector_intensity = torch.mean(detector_values_E[:, :, -1].pow(2), dim=1)
             intensities.append(detector_intensity)
 
-        output = torch.stack(intensities, dim=0)
-        print("output shape:", output.shape)
-        assert output.shape == (ports, simulation_step)
+        output = torch.stack(intensities, dim=1)
+        assert output.shape == (simulation_step, ports)
+        
+        # 归一化：让所有输出的和等于时间步数
+        time_steps = output.size(0)  # 获取时间步数
+        total_sum = output.sum()  # 计算总和
+        output = output * (time_steps / (total_sum + 1e-8))
+        
         return output
 
     def _init_grid(self):
@@ -105,7 +112,7 @@ class FDTDSimulator(nn.Module):
         outside_circle = torch.ones((center_size, center_size), dtype=torch.int, device=device)
 
         for i in range(circle_count * circle_count):
-            mask = (x - x_centers[i]) ** 2 + (y - y_centers[i]) ** 2 <= self.radius[i] ** 2
+            mask = (x - x_centers[i]) ** 2 + (y - y_centers[i]) ** 2 <= self.radius_matrix[i] ** 2
             outside_circle[mask] = 0
         
         self.permittivity = outside_circle.view(center_size, center_size, 1)
