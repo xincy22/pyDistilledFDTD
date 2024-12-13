@@ -20,7 +20,7 @@ def process_and_save_data(n_components=10, eta=0.1, method="kmeans"):
     处理MNIST数据并保存结果：
     1. 加载原始数据
     2. 进行PCA降维
-    3. 选择核心集
+    3. 对训练集和测试集分别选择核心集
     4. 保存所有结果
     """
     # 创建保存目录
@@ -53,47 +53,50 @@ def process_and_save_data(n_components=10, eta=0.1, method="kmeans"):
 
     print("PCA数据已保存")
 
-    # 核心集选择
-    n_samples = int(len(train_data_pca) * eta)
+    def select_core_set(data, labels, n_samples, method):
+        """辅助函数：选择核心集"""
+        if method == "kmeans":
+            kmeans = KMeans(
+                n_clusters=n_samples,
+                random_state=42,
+                init='k-means++',
+                n_init=10
+            )
+            kmeans.fit(data)
+            
+            distances = kmeans.transform(data)
+            closest_points = np.argmin(distances, axis=0)
+            
+            return data[closest_points], labels[closest_points]
+            
+        elif method == "random":
+            indices = np.random.choice(len(data), n_samples, replace=False)
+            return data[indices], labels[indices]
+        
+        else:
+            raise ValueError("method必须是'kmeans'或'random'之一")
 
-    if method == "kmeans":
-        # 使用K-means聚类选择核心集
-        kmeans = KMeans(
-            n_clusters=n_samples,
-            random_state=42,
-            init='k-means++',  # 使用k-means++初始化方法
-            n_init=10  # 运行10次取最好的结果
-        )
-        kmeans.fit(train_data_pca)
+    # 计算训练集和测试集的核心集大小
+    n_train_samples = int(len(train_data_pca) * eta)
+    n_test_samples = int(len(test_data_pca) * eta)
 
-        # 选择离聚类中心最近的点作为核心集
-        distances = kmeans.transform(train_data_pca)
-        closest_points = np.argmin(distances, axis=0)
+    # 分别选择训练集和测试集的核心集
+    core_train_data, core_train_labels = select_core_set(
+        train_data_pca, train_labels, n_train_samples, method
+    )
+    core_test_data, core_test_labels = select_core_set(
+        test_data_pca, test_labels, n_test_samples, method
+    )
 
-        core_data = train_data_pca[closest_points]
-        core_labels = train_labels[closest_points]
-
-    elif method == "random":
-        # 随机选择核心集
-        indices = np.random.choice(
-            len(train_data_pca),
-            n_samples,
-            replace=False
-        )
-        core_data = train_data_pca[indices]
-        core_labels = train_labels[indices]
-
-    else:
-        raise ValueError("method必须是'kmeans'或'random'之一")
-
-    print(f"选择核心集大小: {len(core_data)}")
+    print(f"训练集核心集大小: {len(core_train_data)}")
+    print(f"测试集核心集大小: {len(core_test_data)}")
 
     # 保存核心集结果
     core_set_data = {
-        "core_data": core_data,
-        "core_labels": core_labels,
-        "test_data": test_data_pca,
-        "test_labels": test_labels,
+        "core_train_data": core_train_data,
+        "core_train_labels": core_train_labels,
+        "core_test_data": core_test_data,
+        "core_test_labels": core_test_labels,
         "method": method,
         "eta": eta,
     }
@@ -106,4 +109,4 @@ def process_and_save_data(n_components=10, eta=0.1, method="kmeans"):
 
 if __name__ == "__main__":
     # 处理并保存数据
-    process_and_save_data(n_components=10, eta=0.1, method="kmeans")
+    process_and_save_data(n_components=10, eta=0.005, method="kmeans")

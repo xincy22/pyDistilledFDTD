@@ -42,8 +42,8 @@ def load_core_set_data():
         data = pickle.load(f)
     
     return (
-        data['core_data'],
-        data['core_labels'],
-        data['test_data'],
-        data['test_labels']
+        data['core_train_data'],
+        data['core_train_labels'],
+        data['core_test_data'],
+        data['core_test_labels']
     )
