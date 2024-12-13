@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Optional, Tuple
+from ..config import WAVELENGTH, SPEED_LIGHT, simulation_step
 from .signal_expansion import SignalExpansion
 
 class LSTMPredictor(nn.Module):
@@ -12,9 +13,6 @@ class LSTMPredictor(nn.Module):
         hidden_size: int = 64,    # LSTM隐藏层大小
         num_layers: int = 2,      # LSTM层数
         dropout: float = 0.1,     # dropout率
-        wavelength: float = 1.0,  # 波长
-        speed_light: float = 3e8, # 光速
-        time_steps: int = 1000,   # 时间步数
         device: Optional[torch.device] = None
     ):
         """
@@ -25,9 +23,6 @@ class LSTMPredictor(nn.Module):
             hidden_size: LSTM隐藏层大小
             num_layers: LSTM层数
             dropout: dropout率
-            wavelength: 波长
-            speed_light: 光速
-            time_steps: 时间步数
             device: 计算设备
         """
         super().__init__()
@@ -36,15 +31,15 @@ class LSTMPredictor(nn.Module):
         self.num_layers = num_layers
         self.device = device if device is not None else torch.device('cpu')
         
-        # 创建信号扩展器
+        # 创建信号扩展器，使用配置中的参数
         self.signal_expander = SignalExpansion(
-            wavelength=wavelength,
-            speed_light=speed_light,
-            time_steps=time_steps,
+            wavelength=WAVELENGTH,
+            speed_light=SPEED_LIGHT,
+            time_steps=simulation_step,
             device=self.device
         )
         
-        # LSTM层 - 注意这里input_size增加了1，因为我们添加了零值通道
+        # LSTM层 - 注意input_size增加了1，因为我们添加了零值通道
         self.lstm = nn.LSTM(
             input_size=input_size + 1,  # +1 表示额外的零值通道
             hidden_size=hidden_size,
@@ -78,6 +73,10 @@ class LSTMPredictor(nn.Module):
             zero_channel = torch.zeros(signal.size(0), signal.size(1), 1, device=signal.device)
             return torch.cat([signal, zero_channel], dim=2)
         
+    def _to_intensity(self, x: torch.Tensor) -> torch.Tensor:
+        """将场强转换为光强"""
+        return x.pow(2)
+        
     def forward(self, phase: torch.Tensor) -> torch.Tensor:
         """
         前向传播
@@ -86,7 +85,7 @@ class LSTMPredictor(nn.Module):
             phase: 输入相位，形状为 (batch_size, ports) 或 (ports,)
 
         Returns:
-            torch.Tensor: 预测的输出相位，形状与输入相同
+            torch.Tensor: 预测的输出光强
         """
         # 记录输入维度
         is_batch = phase.dim() == 2
@@ -105,14 +104,17 @@ class LSTMPredictor(nn.Module):
         # 只使用最后一个时间步的输出
         final_hidden = lstm_out[:, -1, :]  # (batch_size, hidden_size)
         
-        # 生成输出相位
+        # 生成输出场强
         output = self.output_layer(final_hidden)  # (batch_size, ports)
+        
+        # 转换为光强
+        intensity = self._to_intensity(output)
         
         # 如果输入不是批量的，去掉批量维度
         if not is_batch:
-            output = output.squeeze(0)
+            intensity = intensity.squeeze(0)
             
-        return output
+        return intensity
     
     def get_sequence_output(self, phase: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -123,8 +125,8 @@ class LSTMPredictor(nn.Module):
 
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: 
-                - 输入序列，形状为 (batch_size, time_steps, ports+1)
-                - 输出序列，形状为 (batch_size, time_steps, ports)
+                - 输入序列（带零值通道），形状为 (batch_size, time_steps, ports+1)
+                - 输出光强序列，形状为 (batch_size, time_steps, ports)
         """
         # 记录输入维度
         is_batch = phase.dim() == 2
@@ -141,9 +143,12 @@ class LSTMPredictor(nn.Module):
         # 生成输出序列
         output_seq = self.output_layer(lstm_out)  # (batch_size, time_steps, ports)
         
+        # 转换为光强序列
+        intensity_seq = self._to_intensity(output_seq)
+        
         # 如果输入不是批量的，去掉批量维度
         if not is_batch:
             input_seq = input_seq.squeeze(0)
-            output_seq = output_seq.squeeze(0)
+            intensity_seq = intensity_seq.squeeze(0)
             
-        return input_seq, output_seq 
+        return input_seq, intensity_seq
