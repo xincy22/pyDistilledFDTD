@@ -106,4 +106,4 @@ def process_and_save_data(n_components=10, eta=0.1, method="kmeans"):
 
 if __name__ == "__main__":
     # 处理并保存数据
-    process_and_save_data(n_components=10, eta=0.1, method="kmeans")
+    process_and_save_data(n_components=10, eta=0.005, method="kmeans")
