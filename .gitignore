@@ -15,9 +15,9 @@ venv/
 env/
 .env/
 
-# 数据文件
-dataset/raw_data/
-dataset/processed_data/
+# # 数据文件
+# dataset/raw_data/
+# dataset/processed_data/
 
 # 日志文件
 *.log
