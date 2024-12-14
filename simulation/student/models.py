@@ -109,7 +109,7 @@ class LSTMPredictor(nn.Module):
         output = self.output_layer(final_hidden)  # (batch_size, ports)
         
         # 转换为光强
-        intensity = self._to_intensity(output)
+        intensity = output.pow(2)
         
         # 如果输入不是批量的，去掉批量维度
         if not is_batch:
@@ -141,8 +141,7 @@ class LSTMPredictor(nn.Module):
         
         # 从这里开始计算梯度
         input_seq = input_seq.detach().requires_grad_(True)
-        
-        # 确保梯度计算被启用
+
         with torch.enable_grad():
             lstm_out, _ = self.lstm(input_seq)
         
@@ -157,9 +156,9 @@ class LSTMPredictor(nn.Module):
             # 对每个batch单独计算和并归一化
             batch_sums = intensity_seq.sum(dim=(1, 2), keepdim=True)  # 计算每个batch的总和
             intensity_seq = intensity_seq * (time_steps / (batch_sums + 1e-8))
-            
+                
             if not is_batch:
                 input_seq = input_seq.squeeze(0)
                 intensity_seq = intensity_seq.squeeze(0)
-        
-        return input_seq, intensity_seq
+            
+            return input_seq, intensity_seq
