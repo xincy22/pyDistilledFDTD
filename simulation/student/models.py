@@ -1,9 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F  # 在文件开头添加这行
 from typing import Optional, Tuple
-from ..config import WAVELENGTH, SPEED_LIGHT, simulation_step
-from .signal_expansion import SignalExpansion
 
 class LSTMPredictor(nn.Module):
     """基于LSTM的学生模型，用于学习FDTD的输入输出映射"""
@@ -34,131 +31,93 @@ class LSTMPredictor(nn.Module):
         self.num_layers = num_layers
         self.device = device if device is not None else torch.device('cpu')
         
-        # 创建信号扩展器，使用配置中的参数
-        self.signal_expander = SignalExpansion(
-            wavelength=WAVELENGTH,
-            speed_light=SPEED_LIGHT,
-            time_steps=simulation_step,
-            device=self.device
-        )
-        
-        # 确保LSTM的参数有梯度
+        # LSTM和输出层设置
         self.lstm = nn.LSTM(
-            input_size=input_size + 1,
+            input_size=input_size + 1,  # +1 是因为输入数据已经包含了额外的通道
             hidden_size=hidden_size,
             num_layers=num_layers,
             dropout=dropout if num_layers > 1 else 0,
             batch_first=True
         )
         
-        # 确保输出层的参数有梯度
         self.output_layer = nn.Linear(hidden_size, output_size)
-        
-        # 将模型移动到指定设备并确保参数可训练
         self.to(device)
-        for param in self.parameters():
-            param.requires_grad = True
         
-    def _add_zero_channel(self, signal: torch.Tensor) -> torch.Tensor:
+    def _validate_input(self, inputs: torch.Tensor) -> Tuple[torch.Tensor, bool]:
         """
-        在信号中添加零值通道
+        验证输入数据格式
 
         Args:
-            signal: 输入信号，形状为 (batch_size, time_steps, ports) 或 (time_steps, ports)
+            inputs: 输入数据，形状应为 (batch_size, time_steps, ports+1) 或 (time_steps, ports+1)
 
         Returns:
-            torch.Tensor: 添加零值通道后的信号，形状为 (batch_size, time_steps, ports+1) 或 (time_steps, ports+1)
+            Tuple[torch.Tensor, bool]: 验证后的输入数据和是否为批量输入的标志
+
+        Raises:
+            ValueError: 当输入数据格式不正确时
         """
-        if signal.dim() == 2:
-            # 如果是2D输入 (time_steps, ports)
-            zero_channel = torch.zeros(signal.size(0), 1, device=signal.device)
-            return torch.cat([signal, zero_channel], dim=1)
-        else:
-            # 如果是3D输入 (batch_size, time_steps, ports)
-            zero_channel = torch.zeros(signal.size(0), signal.size(1), 1, device=signal.device)
-            return torch.cat([signal, zero_channel], dim=2)
+        if inputs.dim() not in [2, 3]:
+            raise ValueError(f"输入维度必须是2或3，当前维度为{inputs.dim()}")
         
-    def forward(self, phase: torch.Tensor) -> torch.Tensor:
+        is_batch = inputs.dim() == 3
+        if not is_batch:
+            inputs = inputs.unsqueeze(0)
+            
+        if len(inputs.shape) != 3:
+            raise ValueError(f"处理后的输入形状必须是(batch_size, time_steps, ports+1)，当前形状为{inputs.shape}")
+            
+        inputs = inputs.to(self.device)
+        return inputs, is_batch
+            
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         """
         前向传播
 
         Args:
-            phase: 输入相位，形状为 (batch_size, ports) 或 (ports,)
+            inputs: 输入数据，形状为 (batch_size, time_steps, ports+1) 或 (time_steps, ports+1)
 
         Returns:
             torch.Tensor: 预测的输出光强
         """
-        # 记录输入维度
-        is_batch = phase.dim() == 2
-        if not is_batch:
-            phase = phase.unsqueeze(0)
-            
-        # 将相位扩展为时序信号
-        signal = self.signal_expander(phase)  # (batch_size, time_steps, ports)
-        
-        # 添加零值通道
-        signal = self._add_zero_channel(signal)  # (batch_size, time_steps, ports+1)
+        # 验证输入数据
+        inputs, is_batch = self._validate_input(inputs)
         
         # LSTM处理
-        lstm_out, _ = self.lstm(signal)  # (batch_size, time_steps, hidden_size)
-        
-        # 只使用最后一个时间步的输出
-        final_hidden = lstm_out[:, -1, :]  # (batch_size, hidden_size)
-        
-        # 生成输出场强
-        output = self.output_layer(final_hidden)  # (batch_size, ports)
-        
-        # 转换为光强
+        lstm_out, _ = self.lstm(inputs)
+        final_hidden = lstm_out[:, -1, :]
+        output = self.output_layer(final_hidden)
         intensity = output.pow(2)
         
-        # 如果输入不是批量的，去掉批量维度
         if not is_batch:
             intensity = intensity.squeeze(0)
             
         return intensity
     
-    def get_sequence_output(self, phase: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def get_sequence_output(self, inputs: torch.Tensor) -> torch.Tensor:
         """
-        获取完整的序列输出，用于分析模型的时序行为
+        获取完整的序列输出
 
         Args:
-            phase: 输入相位，形状为 (batch_size, ports) 或 (ports,)
+            inputs: 输入数据，形状为 (batch_size, time_steps, ports+1) 或 (time_steps, ports+1)
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor]: 
-                - 输入序列（带零值通道），形状为 (batch_size, time_steps, ports+1)
-                - 输出光强序列，形状为 (batch_size, time_steps, ports)
+            torch.Tensor: 输出光强序列，形状为 (batch_size, time_steps, ports) 或 (time_steps, ports)
         """
-        # 记录输入维度
-        is_batch = phase.dim() == 2
-        if not is_batch:
-            phase = phase.unsqueeze(0)
+        # 验证输入数据
+        inputs, is_batch = self._validate_input(inputs)
+        inputs = inputs.detach().requires_grad_(True)
         
-        # 生成输入序列 - 不需要梯度
-        with torch.no_grad():
-            input_seq = self.signal_expander(phase)
-            input_seq = self._add_zero_channel(input_seq)
-        
-        # 从这里开始计算梯度
-        input_seq = input_seq.detach().requires_grad_(True)
-
         with torch.enable_grad():
-            lstm_out, _ = self.lstm(input_seq)
-        
-            # 生成输出序列
+            lstm_out, _ = self.lstm(inputs)
             output_seq = self.output_layer(lstm_out)
-            
-            # 转换为光强序列
             intensity_seq = output_seq.pow(2)
             
-            # 归一化：让每个batch的所有输出的和等于时间步数
-            time_steps = intensity_seq.size(1)  # 获取时间步数
-            # 对每个batch单独计算和并归一化
-            batch_sums = intensity_seq.sum(dim=(1, 2), keepdim=True)  # 计算每个batch的总和
+            # 归一化
+            time_steps = intensity_seq.size(1)
+            batch_sums = intensity_seq.sum(dim=(1, 2), keepdim=True)
             intensity_seq = intensity_seq * (time_steps / (batch_sums + 1e-8))
-                
+            
             if not is_batch:
-                input_seq = input_seq.squeeze(0)
                 intensity_seq = intensity_seq.squeeze(0)
             
-            return input_seq, intensity_seq
+            return intensity_seq

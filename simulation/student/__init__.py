@@ -1,4 +1,4 @@
-from .signal_expansion import SignalExpansion
+from .data_transform import DataTransformer
 from .models import LSTMPredictor
 
-__all__ = ['SignalExpansion', 'LSTMPredictor'] 
+__all__ = ['DataTransformer', 'LSTMPredictor'] 
