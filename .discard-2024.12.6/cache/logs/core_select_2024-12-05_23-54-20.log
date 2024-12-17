@@ -1,4 +1,0 @@
-2024-12-05 23:54:20,632 - core_select - INFO - Greedy core selection finished, selected 100 cores
-2024-12-05 23:54:20,635 - core_select - INFO - Core selection finished, dataset shape: torch.Size([100, 10])
-2024-12-05 23:54:20,762 - core_select - INFO - KMeans core selection finished, selected 100 cores
-2024-12-05 23:54:20,764 - core_select - INFO - Core selection finished, dataset shape: torch.Size([100, 10])

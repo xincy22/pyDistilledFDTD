@@ -1,2 +1,0 @@
-2024-12-06 16:03:26,652 - core_select - INFO - Greedy core selection finished, selected 30000 cores
-2024-12-06 16:03:26,670 - core_select - INFO - Core selection finished, dataset shape: torch.Size([30000, 10])
