@@ -11,9 +11,20 @@ from .config import DISTILL_DATA_DIR
 from student.time_series import DataTransformer
 
 class FDTDDataset(Dataset):
-    def __init__(self, data, labels):
-        self.data = torch.FloatTensor(data)
-        self.labels = torch.FloatTensor(labels)
+    def __init__(
+            self, 
+            data: torch.Tensor | np.ndarray, 
+            labels: torch.Tensor | np.ndarray
+    ):
+        if isinstance(data, np.ndarray):
+            self.data = torch.FloatTensor(data)
+        else:
+            self.data = data.float()
+
+        if isinstance(labels, np.ndarray):
+            self.labels = torch.FloatTensor(labels)
+        else:
+            self.labels = labels.float()
 
     def __len__(self):
         return len(self.data)
