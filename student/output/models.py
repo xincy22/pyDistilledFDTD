@@ -26,6 +26,8 @@ class ResidualBlock(nn.Module):
 class DeepResNet(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_dim=2048, num_blocks=8):
         super().__init__()
+
+        torch.set_default_dtype(torch.float32)
         
         # 输入投影层
         self.input_proj = nn.Sequential(
