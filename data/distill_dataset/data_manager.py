@@ -1,5 +1,4 @@
 import os
-
 import hashlib
 from diskcache import Cache
 import numpy as np
@@ -9,11 +8,12 @@ from torch.utils.data import Dataset
 from ..base_dataset.data_loader import load_core_set_data
 from simulation import FDTDSimulator
 from .config import DISTILL_DATA_DIR
+from student.time_series import DataTransformer
 
 class FDTDDataset(Dataset):
     def __init__(self, data, labels):
         self.data = torch.FloatTensor(data)
-        self.labels = torch.LongTensor(labels)
+        self.labels = torch.FloatTensor(labels)
 
     def __len__(self):
         return len(self.data)
@@ -22,7 +22,6 @@ class FDTDDataset(Dataset):
         return self.data[idx], self.labels[idx]
 
 class DistillDataManager:
-
     def __init__(self, radius_matrix: torch.Tensor | np.ndarray):
         if isinstance(radius_matrix, np.ndarray):
             self.radius_matrix = torch.FloatTensor(radius_matrix.copy())
@@ -36,7 +35,6 @@ class DistillDataManager:
             self.cache['matrix_hash_index'] = {}
 
         self.matrix_key = self._get_matrix_key()
-
 
     def _calculate_matrix_hash(self):
         matrix_bytes = self.radius_matrix.numpy().tobytes()
@@ -65,62 +63,89 @@ class DistillDataManager:
 
         return matrix_key
 
-    def get_train_dataset(self, regenerate: bool = False):
-        train_key = f"{self.matrix_key}_train"
+    def _generate_dataset(self, data, mode='serial'):
+        """生成数据集
+        Args:
+            data: 输入数据
+            mode: 'serial' 或 'output'，决定数据处理方式
+        """
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        simulator = FDTDSimulator(self.radius_matrix)
+        
+        # 将数据批量转移到GPU
+        x_batch = torch.tensor(data, device=device)
+        y_batch = simulator(x_batch).detach()  # [batch_size, time_steps, ports]
+        
+        if mode == 'output':
+            # 对时序数据取平均，得到每个端口的平均输出
+            y_batch = y_batch.mean(dim=1)  # [batch_size, ports]
+        
+        # 如果是serial模式，需要使用data_transformer处理输入
+        if mode == 'serial':
+            data_transformer = DataTransformer(device=device)
+            x_batch = data_transformer(x_batch)
+        
+        return x_batch.cpu(), y_batch.cpu()
+
+    def get_train_dataset(self, mode='serial', regenerate: bool = False):
+        """获取训练数据集
+        Args:
+            mode: 'serial' 或 'output'，决定数据处理方式
+            regenerate: 是否重新生成数据
+        """
+        train_key = f"{self.matrix_key}_{mode}_train"
 
         if not regenerate and train_key in self.cache:
             data = self.cache[train_key]
             return FDTDDataset(data['inputs'], data['labels'])
         
         train_data, _, _, _ = load_core_set_data()
-        inputs, labels = self._generate_dataset(train_data)
+        inputs, labels = self._generate_dataset(train_data, mode=mode)
 
         self.cache[train_key] = {'inputs': inputs, 'labels': labels}
 
         return FDTDDataset(inputs, labels)
 
-    def get_test_dataset(self):
-        test_key = f"{self.matrix_key}_test"
+    def get_test_dataset(self, mode='serial'):
+        """获取测试数据集
+        Args:
+            mode: 'serial' 或 'output'，决定数据处理方式
+        """
+        test_key = f"{self.matrix_key}_{mode}_test"
 
         if test_key in self.cache:
             data = self.cache[test_key]
             return FDTDDataset(data['inputs'], data['labels'])
 
         _, _, test_data, _ = load_core_set_data()
-        inputs, labels = self._generate_dataset(test_data)
+        inputs, labels = self._generate_dataset(test_data, mode=mode)
 
         self.cache[test_key] = {'inputs': inputs, 'labels': labels}
 
         return FDTDDataset(inputs, labels)
 
-    def _generate_dataset(self, data):
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        simulator = FDTDSimulator(self.radius_matrix)
-        
-        x_batch = torch.tensor(data, device=device)
-        y_batch = simulator(x_batch).detach().cpu()
-
-        return x_batch, y_batch
-
-    def save_series_model(self, model: torch.nn.Module):
-        model_key = f"{self.matrix_key}_series_model"
+    def save_model(self, model: torch.nn.Module, mode='serial'):
+        """保存模型
+        Args:
+            model: 要保存的模型
+            mode: 'serial' 或 'output'，指定模型类型
+        """
+        model_key = f"{self.matrix_key}_{mode}_model"
         self.cache[model_key] = model.state_dict()
 
-    def save_output_model(self, model: torch.nn.Module):
-        model_key = f"{self.matrix_key}_output_model"
-        self.cache[model_key] = model.state_dict()
-
-    def load_series_model(self, model: torch.nn.Module):
-        model_key = f"{self.matrix_key}_series_model"
-        if model_key in self.cache: 
-            model.load_state_dict(self.cache[model_key])
-
-    def load_output_model(self, model: torch.nn.Module):
-        model_key = f"{self.matrix_key}_output_model"
+    def load_model(self, model: torch.nn.Module, mode='serial'):
+        """加载模型
+        Args:
+            model: 要加载的模型
+            mode: 'serial' 或 'output'，指定模型类型
+        """
+        model_key = f"{self.matrix_key}_{mode}_model"
         if model_key in self.cache:
             model.load_state_dict(self.cache[model_key])
+        return model
 
     def clear_cache(self):
+        """清理与当前矩阵相关的所有缓存数据"""
         matrix_hash = self._calculate_matrix_hash()
         hash_index = self.cache['matrix_hash_index']
 
@@ -128,9 +153,11 @@ class DistillDataManager:
             for key in hash_index[matrix_hash]:
                 if torch.equal(self.radius_matrix, self.cache[key]):
                     self.cache.delete(key)
-                    self.cache.delete(f"{key}_train")
-                    self.cache.delete(f"{key}_test")
-                    self.cache.delete(f"{key}_series_model")
+                    self.cache.delete(f"{key}_serial_train")
+                    self.cache.delete(f"{key}_serial_test")
+                    self.cache.delete(f"{key}_output_train")
+                    self.cache.delete(f"{key}_output_test")
+                    self.cache.delete(f"{key}_serial_model")
                     self.cache.delete(f"{key}_output_model")
                     hash_index[matrix_hash].remove(key)
 
