@@ -7,7 +7,7 @@ from torchvision import datasets, transforms
 root_dir = str(Path(__file__).parent.parent.parent)
 sys.path.append(root_dir)
 
-from dataset.config import RAW_DATA_DIR
+from base_dataset.config import RAW_DATA_DIR
 
 
 def load_mnist():

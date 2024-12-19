@@ -11,8 +11,8 @@ from sklearn.decomposition import PCA
 root_dir = str(Path(__file__).parent.parent.parent)
 sys.path.append(root_dir)
 
-from dataset.config import CORE_SET_DATA_PATH, PCA_DATA_PATH, PROCESSED_DATA_DIR
-from dataset.process.load_data import load_mnist
+from base_dataset.config import CORE_SET_DATA_PATH, PCA_DATA_PATH, PROCESSED_DATA_DIR
+from base_dataset.process.load_data import load_mnist
 
 
 def process_and_save_data(n_components=10, eta=0.1, method="kmeans"):
